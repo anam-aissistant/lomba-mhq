@@ -236,12 +236,14 @@
     
     // Mark paket sebagai used (sync ke server)
     async function markPaketUsed(id) {
-      // Update local immediately for responsive UI
+      // CRITICAL: Update local FIRST immediately for persistent UI
       if (!cachedUsed.includes(id)) {
         cachedUsed.push(id);
-        renderPaketCards();
       }
+      // Render immediately - don't wait for server
+      renderPaketCards();
       
+      // Then sync to server in background
       try {
         const response = await fetch('/api/mark-used', {
           method: 'POST',
@@ -251,12 +253,17 @@
         
         if (response.ok) {
           const data = await response.json();
-          cachedUsed = data.used;
+          // Merge server data with local (server wins for other juri updates)
+          data.used.forEach(usedId => {
+            if (!cachedUsed.includes(usedId)) {
+              cachedUsed.push(usedId);
+            }
+          });
           renderPaketCards();
         }
       } catch (error) {
         console.error('Error marking paket:', error);
-        // Already updated locally above
+        // Local state already updated, UI persists
       }
     }
     
