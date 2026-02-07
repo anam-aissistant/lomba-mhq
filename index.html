@@ -120,7 +120,7 @@
         document.getElementById('resetBtn').style.display = 'block';
         document.getElementById('accessibilityPanel').style.display = 'flex';
         localStorage.setItem('mhq_authenticated', 'true');
-        renderDaftarPaket();
+        renderDaftarPaket(); // Async, no need to await here
       } else {
         document.getElementById('passwordError').classList.add('show');
         document.getElementById('passwordInput').value = '';
@@ -138,26 +138,130 @@
       document.getElementById('accessibilityPanel').style.display = 'flex';
     }
 
-    // LOCALSTORAGE untuk track paket yang sudah digunakan
-    function getUsedPaket() {
-      const used = localStorage.getItem('mhq_used_paket');
-      return used ? JSON.parse(used) : [];
+    // SERVER-SIDE STATE MANAGEMENT (Vercel Blob)
+    let cachedUsed = [];
+    let syncInterval = null;
+    
+    // Ambil state dari server
+    async function getUsedPaketFromServer() {
+      try {
+        const response = await fetch('/api/state');
+        if (response.ok) {
+          const data = await response.json();
+          return data.used || [];
+        }
+      } catch (error) {
+        console.error('Error fetching state:', error);
+      }
+      return cachedUsed; // Fallback ke cache
     }
     
-    function markPaketUsed(id) {
-      const used = getUsedPaket();
-      if (!used.includes(id)) {
-        used.push(id);
-        localStorage.setItem('mhq_used_paket', JSON.stringify(used));
+    // Update cache dan render
+    async function refreshUsedPaket() {
+      const used = await getUsedPaketFromServer();
+      cachedUsed = used;
+      renderPaketCards();
+      return used;
+    }
+    
+    // Mark paket sebagai used (sync ke server)
+    async function markPaketUsed(id) {
+      try {
+        const response = await fetch('/api/mark-used', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paketId: id })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          cachedUsed = data.used;
+          renderPaketCards();
+        }
+      } catch (error) {
+        console.error('Error marking paket:', error);
+        // Fallback: tetap update UI
+        if (!cachedUsed.includes(id)) {
+          cachedUsed.push(id);
+          renderPaketCards();
+        }
       }
     }
     
-    function resetUsedPaket() {
-      if (confirm('Yakin ingin reset semua data paket? Semua tanda ✓ akan dihapus.')) {
-        localStorage.removeItem('mhq_used_paket');
-        renderDaftarPaket();
-        alert('Data paket berhasil direset!');
+    // Reset semua paket
+    async function resetUsedPaket() {
+      if (!confirm('Yakin ingin reset semua data paket? Semua tanda ✓ akan dihapus.')) {
+        return;
       }
+      
+      try {
+        const response = await fetch('/api/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          cachedUsed = [];
+          renderPaketCards();
+          alert('Data paket berhasil direset!');
+        }
+      } catch (error) {
+        console.error('Error resetting:', error);
+        alert('Gagal reset. Coba lagi.');
+      }
+    }
+    
+    // Start polling untuk sync antar juri (tiap 3 detik)
+    function startSync() {
+      if (syncInterval) return;
+      syncInterval = setInterval(async () => {
+        if (document.getElementById('view-daftar').style.display !== 'none') {
+          await refreshUsedPaket();
+        }
+      }, 3000);
+    }
+    
+    // Stop polling
+    function stopSync() {
+      if (syncInterval) {
+        clearInterval(syncInterval);
+        syncInterval = null;
+      }
+    }
+    
+    // Render paket cards (gunakan cachedUsed)
+    function renderPaketCards() {
+      const grid = document.getElementById('paket-grid');
+      if (!grid) return;
+      
+      const used = cachedUsed;
+      
+      // Hanya update class, tidak re-create element jika sudah ada
+      for (let i = 1; i <= 30; i++) {
+        let card = document.getElementById(`paket-card-${i}`);
+        
+        if (!card) {
+          // Create new card
+          card = document.createElement('a');
+          card.id = `paket-card-${i}`;
+          card.href = '#';
+          card.onclick = (e) => { e.preventDefault(); showPaket(i); };
+          card.innerHTML = `
+            <span class="number">${i}</span>
+            <span class="label">Paket</span>
+          `;
+          grid.appendChild(card);
+        }
+        
+        // Update class
+        card.className = 'paket-card' + (used.includes(i) ? ' used' : '');
+      }
+    }
+    
+    // Render daftar paket (dipanggil saat init dan showDaftar)
+    async function renderDaftarPaket() {
+      await refreshUsedPaket();
+      startSync(); // Mulai polling
     }
 
     // ACCESSIBILITY SETTINGS
@@ -236,20 +340,24 @@
     }
 
     // Show daftar paket
-    function showDaftar() {
+    async function showDaftar() {
       document.getElementById('view-daftar').style.display = 'block';
       document.getElementById('view-soal').style.display = 'none';
       window.scrollTo(0, 0);
-      renderDaftarPaket(); // Refresh untuk update status used
+      await refreshUsedPaket();
+      startSync();
     }
 
     // Show detail paket
-    function showPaket(id) {
+    async function showPaket(id) {
       const paket = PAKET_SOAL.find(p => p.id === id);
       if (!paket) return;
       
+      // Stop sync saat melihat soal (hemat request)
+      stopSync();
+      
       // Mark sebagai used
-      markPaketUsed(id);
+      await markPaketUsed(id);
 
       const container = document.getElementById('soal-container');
       
@@ -344,10 +452,10 @@
     }
 
     // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
       loadAccessibilitySettings();
       if (localStorage.getItem('mhq_authenticated') === 'true') {
-        renderDaftarPaket();
+        await renderDaftarPaket();
       }
     });
   </script>
