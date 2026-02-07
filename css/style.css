@@ -144,10 +144,46 @@ body {
   padding: 1rem;
   z-index: 1000;
   box-shadow: 0 10px 30px var(--shadow);
-  display: flex;
+  display: none; /* Hidden by default, shown via JS */
   flex-direction: column;
   gap: 0.75rem;
   min-width: 200px;
+  max-width: 280px;
+}
+
+.accessibility-panel.show {
+  display: flex;
+}
+
+.accessibility-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--gradient-gold);
+  color: var(--bg-dark);
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  z-index: 1001;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.accessibility-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.5);
+}
+
+.accessibility-toggle.active {
+  background: var(--bg-card);
+  color: var(--gold);
+  border: 2px solid var(--gold);
 }
 
 .accessibility-title {
@@ -637,11 +673,51 @@ footer {
     text-align: center;
   }
   
+  /* Password modal responsive */
+  .password-modal {
+    padding: 1.5rem;
+    max-width: 90%;
+    width: 90%;
+    margin: 1rem;
+  }
+  
+  .password-modal h2 {
+    font-size: 1.25rem;
+  }
+  
+  .password-modal .lock-icon {
+    font-size: 2rem;
+  }
+  
+  .password-input-group {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .password-input {
+    width: 100%;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  .password-btn {
+    width: 100%;
+    padding: 0.75rem;
+  }
+  
+  /* Accessibility panel responsive */
   .accessibility-panel {
-    bottom: 10px;
+    bottom: 80px;
     right: 10px;
     left: 10px;
     min-width: auto;
+    max-width: none;
+  }
+  
+  .accessibility-toggle {
+    bottom: 20px;
+    right: 20px;
+    width: 56px;
+    height: 56px;
   }
   
   .reset-btn {
@@ -649,6 +725,7 @@ footer {
     right: 10px;
     padding: 0.4rem 0.8rem;
     font-size: 0.75rem;
+    z-index: 998;
   }
 }
 

@@ -30,8 +30,12 @@
   </button>
 
   <!-- ACCESSIBILITY PANEL -->
-  <div id="accessibilityPanel" class="accessibility-panel" style="display: none;">
-    <div class="accessibility-title">⚙️ Pengaturan Tampilan</div>
+  <button id="accessibilityToggle" class="accessibility-toggle" onclick="toggleAccessibilityPanel()" style="display: none;">
+    ⚙️
+  </button>
+  
+  <div id="accessibilityPanel" class="accessibility-panel">
+    <div class="accessibility-title">⚙️ Pengaturan Tampilan <button onclick="toggleAccessibilityPanel()" style="background: none; border: none; color: var(--gold); cursor: pointer; float: right; font-size: 1.2rem;">✕</button></div>
     
     <!-- Font Size -->
     <div class="accessibility-row">
@@ -111,15 +115,81 @@
   <script src="data/soal.js"></script>
   <script>
     // PASSWORD PROTECTION
-    const CORRECT_PASSWORD = 'mardliyahshalihahcantik';
+    const CORRECT_PASSWORD = '#mhqCRF2026!';
+    const SESSION_TIMEOUT = 10 * 60 * 1000; // 10 menit dalam milliseconds
+    let sessionTimer = null;
+    let lastActivity = Date.now();
+    
+    // Track user activity
+    function updateActivity() {
+      lastActivity = Date.now();
+      if (localStorage.getItem('mhq_authenticated') === 'true') {
+        localStorage.setItem('mhq_last_activity', lastActivity);
+      }
+    }
+    
+    // Check session timeout
+    function checkSessionTimeout() {
+      const last = parseInt(localStorage.getItem('mhq_last_activity') || '0');
+      const now = Date.now();
+      
+      if (now - last > SESSION_TIMEOUT) {
+        // Session expired
+        logout();
+        return true;
+      }
+      return false;
+    }
+    
+    // Logout function
+    function logout() {
+      localStorage.removeItem('mhq_authenticated');
+      localStorage.removeItem('mhq_last_activity');
+      stopSync();
+      
+      // Show password modal
+      document.getElementById('passwordModal').style.display = 'flex';
+      document.getElementById('resetBtn').style.display = 'none';
+      document.getElementById('accessibilityPanel').style.display = 'none';
+      document.getElementById('accessibilityPanel').classList.remove('show');
+      document.getElementById('accessibilityToggle').style.display = 'none';
+      document.getElementById('accessibilityToggle').classList.remove('active');
+      document.getElementById('passwordInput').value = '';
+      document.getElementById('passwordError').classList.remove('show');
+      
+      // Hide views
+      document.getElementById('view-daftar').style.display = 'none';
+      document.getElementById('view-soal').style.display = 'none';
+    }
+    
+    // Start session timer
+    function startSessionTimer() {
+      if (sessionTimer) clearInterval(sessionTimer);
+      sessionTimer = setInterval(() => {
+        if (localStorage.getItem('mhq_authenticated') === 'true') {
+          checkSessionTimeout();
+        }
+      }, 30000); // Check setiap 30 detik
+    }
+    
+    // Setup activity listeners
+    function setupActivityListeners() {
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+      events.forEach(event => {
+        document.addEventListener(event, updateActivity, true);
+      });
+    }
     
     function checkPassword() {
       const input = document.getElementById('passwordInput').value;
       if (input === CORRECT_PASSWORD) {
         document.getElementById('passwordModal').style.display = 'none';
         document.getElementById('resetBtn').style.display = 'block';
-        document.getElementById('accessibilityPanel').style.display = 'flex';
+        document.getElementById('accessibilityToggle').style.display = 'flex';
         localStorage.setItem('mhq_authenticated', 'true');
+        localStorage.setItem('mhq_last_activity', Date.now());
+        setupActivityListeners();
+        startSessionTimer();
         renderDaftarPaket(); // Async, no need to await here
       } else {
         document.getElementById('passwordError').classList.add('show');
@@ -166,6 +236,12 @@
     
     // Mark paket sebagai used (sync ke server)
     async function markPaketUsed(id) {
+      // Update local immediately for responsive UI
+      if (!cachedUsed.includes(id)) {
+        cachedUsed.push(id);
+        renderPaketCards();
+      }
+      
       try {
         const response = await fetch('/api/mark-used', {
           method: 'POST',
@@ -180,11 +256,7 @@
         }
       } catch (error) {
         console.error('Error marking paket:', error);
-        // Fallback: tetap update UI
-        if (!cachedUsed.includes(id)) {
-          cachedUsed.push(id);
-          renderPaketCards();
-        }
+        // Already updated locally above
       }
     }
     
@@ -262,6 +334,20 @@
     async function renderDaftarPaket() {
       await refreshUsedPaket();
       startSync(); // Mulai polling
+    }
+
+    // Toggle accessibility panel
+    function toggleAccessibilityPanel() {
+      const panel = document.getElementById('accessibilityPanel');
+      const toggle = document.getElementById('accessibilityToggle');
+      
+      if (panel.classList.contains('show')) {
+        panel.classList.remove('show');
+        toggle.classList.remove('active');
+      } else {
+        panel.classList.add('show');
+        toggle.classList.add('active');
+      }
     }
 
     // ACCESSIBILITY SETTINGS
@@ -435,7 +521,19 @@
     // Initialize
     document.addEventListener('DOMContentLoaded', async function() {
       loadAccessibilitySettings();
+      
+      // Check if session expired on load
       if (localStorage.getItem('mhq_authenticated') === 'true') {
+        if (checkSessionTimeout()) {
+          // Session expired, will show password modal
+          return;
+        }
+        // Session valid, restore state
+        document.getElementById('passwordModal').style.display = 'none';
+        document.getElementById('resetBtn').style.display = 'block';
+        document.getElementById('accessibilityToggle').style.display = 'flex';
+        setupActivityListeners();
+        startSessionTimer();
         await renderDaftarPaket();
       }
     });
