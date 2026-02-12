@@ -398,8 +398,9 @@
         await _renderDaftarView();
       } else if (hash.startsWith('#paket/')) {
         // Detail Paket
-        const id = hash.split('/')[1];
-        if (id) {
+        const idStr = hash.split('/')[1];
+        const id = parseInt(idStr);
+        if (id && !isNaN(id)) {
           await _renderPaketDetailView(id);
         } else {
           window.location.hash = ''; // Invalid id, go home

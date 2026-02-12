@@ -17,10 +17,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { paketId } = req.body;
-    console.log('Mark Used API - paketId:', paketId);
+    let { paketId } = req.body;
+    console.log('Mark Used API - Raw paketId:', paketId, 'type:', typeof paketId);
     
-    if (!paketId || typeof paketId !== 'number') {
+    // Parse input to integer
+    paketId = parseInt(paketId);
+    
+    if (!paketId || isNaN(paketId)) {
       return res.status(400).json({ error: 'Invalid paketId' });
     }
 
