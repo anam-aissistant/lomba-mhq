@@ -212,10 +212,6 @@
       document.getElementById('accessibilityPanel').style.display = 'flex';
     }
 
-    // SERVER-SIDE STATE MANAGEMENT (Vercel Blob)
-    let cachedUsed = [];
-    let syncInterval = null;
-    
     // SERVER-SIDE STATE MANAGEMENT (Upstash Redis + LocalStorage sync/fallback)
     let cachedUsed = [];
     let syncInterval = null;
