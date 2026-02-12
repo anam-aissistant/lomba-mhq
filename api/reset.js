@@ -1,15 +1,7 @@
 // API Route: /api/reset
-// Reset semua state (hapus semua paket yang sudah digunakan)
-
 import { Redis } from '@upstash/redis';
 
 const REDIS_KEY = 'mhq-used-paket';
-let memoryStore = { used: [] };
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-});
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,23 +17,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Reset memory
-    memoryStore.used = [];
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
     
-    const hasRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
-    
-    if (hasRedis) {
-      try {
-        // Delete dari Redis
-        await redis.del(REDIS_KEY);
-      } catch (redisError) {
-        console.error('Redis del error:', redisError.message);
-      }
+    console.log('Reset API - URL exists:', !!url);
+    console.log('Reset API - Token exists:', !!token);
+
+    if (!url || !token) {
+      console.log('Reset API - No Redis config');
+      return res.status(200).json({ success: true, used: [], source: 'none' });
     }
 
-    return res.status(200).json({ success: true, used: [] });
+    const redis = new Redis({ url, token });
+    
+    try {
+      await redis.del(REDIS_KEY);
+      console.log('Reset API - Redis deleted');
+      return res.status(200).json({ success: true, used: [], source: 'redis' });
+    } catch (redisErr) {
+      console.error('Reset API - Redis error:', redisErr.message);
+      return res.status(200).json({ success: true, used: [], source: 'error' });
+    }
   } catch (error) {
-    console.error('Reset API Error:', error);
-    return res.status(500).json({ error: 'Internal server error', details: error.message });
+    console.error('Reset API - Fatal error:', error.message);
+    return res.status(500).json({ error: 'Internal error', message: error.message });
   }
 }

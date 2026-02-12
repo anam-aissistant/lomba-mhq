@@ -1,15 +1,7 @@
 // API Route: /api/state
-// Mengambil daftar paket yang sudah digunakan dari Upstash Redis
-
 import { Redis } from '@upstash/redis';
 
 const REDIS_KEY = 'mhq-used-paket';
-let memoryStore = { used: [] };
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-});
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,30 +17,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    const hasRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
-    let used = [];
-    let source = 'memory';
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
     
-    if (hasRedis) {
-      try {
-        const redisData = await redis.get(REDIS_KEY);
-        if (redisData) {
-          used = Array.isArray(redisData) ? redisData : [];
-          source = 'redis';
-        }
-        // Update memory store
-        memoryStore.used = used;
-      } catch (redisError) {
-        console.log('Redis get error:', redisError.message);
-        used = [...memoryStore.used];
-      }
-    } else {
-      used = [...memoryStore.used];
+    console.log('State API - URL exists:', !!url);
+    console.log('State API - Token exists:', !!token);
+
+    if (!url || !token) {
+      console.log('State API - No Redis config, returning empty');
+      return res.status(200).json({ used: [], source: 'none' });
     }
 
-    return res.status(200).json({ used, source });
+    const redis = new Redis({ url, token });
+    
+    try {
+      const data = await redis.get(REDIS_KEY);
+      console.log('State API - Redis data:', data);
+      
+      const used = data || [];
+      return res.status(200).json({ used, source: 'redis' });
+    } catch (redisErr) {
+      console.error('State API - Redis error:', redisErr.message);
+      return res.status(200).json({ used: [], source: 'error', error: redisErr.message });
+    }
   } catch (error) {
-    console.error('State API Error:', error);
-    return res.status(500).json({ error: 'Internal server error', details: error.message });
+    console.error('State API - Fatal error:', error.message);
+    return res.status(500).json({ error: 'Internal error', message: error.message });
   }
 }
