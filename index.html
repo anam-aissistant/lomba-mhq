@@ -328,7 +328,8 @@
           card = document.createElement('a');
           card.id = `paket-card-${i}`;
           card.href = '#';
-          card.onclick = (e) => { e.preventDefault(); showPaket(i); };
+          // Fix closure: capture i dengan IIFE
+          card.onclick = ((id) => (e) => { e.preventDefault(); showPaket(id); })(i);
           card.innerHTML = `
             <span class="number">${i}</span>
             <span class="label">Paket</span>
