@@ -229,11 +229,13 @@ function generateSoal() {
           nomor: soalNum,
           tipe: 'Lantunkan',
           perintah: `Lantunkan ayat ${s.ayatStart}-${s.ayatEnd} QS ${s.surah}`,
-          pertanyaan: ayatTexts.join(' '),
+          pertanyaanArray: ayatTexts,
+          pertanyaan: ayatTexts.join(' ۝ '),
           kunciJawaban: {
             surah: s.surah,
             ayat: `${s.ayatStart}-${s.ayatEnd}`,
-            teks: ayatTexts.join(' ')
+            teksArray: ayatTexts,
+            teks: ayatTexts.join(' ۝ ')
           }
         });
         
@@ -254,7 +256,8 @@ function generateSoal() {
           kunciJawaban: {
             surah: s.surah,
             ayat: s.jawabanAyat.join('-'),
-            teks: jawabanTexts.join(' ')
+            teksArray: jawabanTexts,
+            teks: jawabanTexts.join(' ۝ ')
           }
         });
         
@@ -276,7 +279,8 @@ function generateSoal() {
           kunciJawaban: {
             surah: s.jawabanSurah,
             ayat: s.jawabanAyat.join('-'),
-            teks: jawabanTexts.join(' ')
+            teksArray: jawabanTexts,
+            teks: jawabanTexts.join(' ۝ ')
           }
         });
       }

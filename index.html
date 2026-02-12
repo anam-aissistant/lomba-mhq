@@ -427,15 +427,10 @@
     }
 
     // Format ayat dengan simbol pembatas antar ayat
-    function formatAyatDenganPembatas(ayatTeks, ayatRange) {
-      if (!ayatTeks || !ayatRange) return ayatTeks;
-      
-      // Split ayat menjadi array individual
-      // Pattern: cari spasi yang diikuti oleh karakter Arab (awal ayat baru)
-      const ayatList = ayatTeks.split(/(?=\s+[\u0600-\u06FF])/).filter(a => a.trim());
-      
-      // Join ayat dengan simbol ۝ sebagai pemisah antar ayat
-      return ayatList.join(' ۝ ');
+    function formatAyatDenganPembatas(ayatArray) {
+      if (!ayatArray || ayatArray.length === 0) return '';
+      // Join array ayat dengan simbol ۝ sebagai pemisah
+      return ayatArray.join(' ۝ ');
     }
 
     // Show detail paket
@@ -466,7 +461,7 @@
         
         // Untuk soal Lanjutkan dan Transisi: tampilkan ayat referensi (pertanyaan)
         if (soal.tipe !== 'Lantunkan' && soal.pertanyaan) {
-          const pertanyaanFormatted = formatAyatDenganPembatas(soal.pertanyaan, soal.kunciJawaban.ayat);
+          const pertanyaanFormatted = formatAyatDenganPembatas([soal.pertanyaan]);
           contentHTML += `
             <div class="ayat-box">
               ${pertanyaanFormatted}
@@ -475,8 +470,8 @@
           `;
         }
 
-        // Format kunci jawaban dengan simbol pembatas
-        const kunciFormatted = formatAyatDenganPembatas(soal.kunciJawaban.teks, soal.kunciJawaban.ayat);
+        // Format kunci jawaban dengan simbol pembatas (gunakan teksArray)
+        const kunciFormatted = formatAyatDenganPembatas(soal.kunciJawaban.teksArray || [soal.kunciJawaban.teks]);
 
         soalHTML += `
           <div class="soal-item">
