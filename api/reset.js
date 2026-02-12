@@ -1,12 +1,15 @@
 // API Route: /api/reset
 // Reset semua state (hapus semua paket yang sudah digunakan)
 
-import { put } from '@vercel/blob';
+import { Redis } from '@upstash/redis';
 
-const BLOB_KEY = 'mhq-used-paket.json';
-
-// Shared memory store
+const REDIS_KEY = 'mhq-used-paket';
 let memoryStore = { used: [] };
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL || '',
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+});
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,28 +25,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('Reset - Starting reset...');
-    
     // Reset memory
     memoryStore.used = [];
-    console.log('Reset - Memory store cleared');
     
-    const hasBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
-    console.log('Reset - Has BLOB token:', hasBlobToken ? 'yes' : 'no');
+    const hasRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
     
-    if (hasBlobToken) {
-      // Reset ke array kosong di Blob
+    if (hasRedis) {
       try {
-        await put(BLOB_KEY, JSON.stringify({ used: [], resetAt: new Date().toISOString() }), {
-          contentType: 'application/json',
-          access: 'public',
-        });
-        console.log('Reset - Blob reset success');
-      } catch (blobError) {
-        console.error('Reset - Blob put error:', blobError);
+        // Delete dari Redis
+        await redis.del(REDIS_KEY);
+      } catch (redisError) {
+        console.error('Redis del error:', redisError.message);
       }
-    } else {
-      console.log('Reset - No BLOB token, memory only');
     }
 
     return res.status(200).json({ success: true, used: [] });

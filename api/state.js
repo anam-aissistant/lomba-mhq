@@ -1,56 +1,52 @@
 // API Route: /api/state
-// Mengambil daftar paket yang sudah digunakan dari Vercel Blob
+// Mengambil daftar paket yang sudah digunakan dari Upstash Redis
 
-import { get } from '@vercel/blob';
+import { Redis } from '@upstash/redis';
 
-const BLOB_KEY = 'mhq-used-paket.json';
-
-// Shared memory store (akan di-reset saat serverless cold start)
+const REDIS_KEY = 'mhq-used-paket';
 let memoryStore = { used: [] };
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL || '',
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+});
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    if (req.method === 'GET') {
-      const hasBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
-      
-      if (hasBlobToken) {
-        try {
-          const blob = await get(BLOB_KEY);
-          console.log('State GET - Blob retrieved:', blob ? 'yes' : 'no');
-          
-          if (blob) {
-            const text = await blob.text();
-            console.log('State GET - Blob text:', text.substring(0, 100));
-            
-            const data = JSON.parse(text);
-            const used = data.used || [];
-            
-            // Update memory store juga
-            memoryStore.used = used;
-            
-            return res.status(200).json({ used });
-          } else {
-            console.log('State GET - Blob not found, using memory:', memoryStore.used);
-          }
-        } catch (e) {
-          console.error('State GET - Blob error:', e.message);
+    const hasRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
+    let used = [];
+    let source = 'memory';
+    
+    if (hasRedis) {
+      try {
+        const redisData = await redis.get(REDIS_KEY);
+        if (redisData) {
+          used = Array.isArray(redisData) ? redisData : [];
+          source = 'redis';
         }
-      } else {
-        console.log('State GET - No BLOB token, using memory:', memoryStore.used);
+        // Update memory store
+        memoryStore.used = used;
+      } catch (redisError) {
+        console.log('Redis get error:', redisError.message);
+        used = [...memoryStore.used];
       }
-      
-      return res.status(200).json({ used: memoryStore.used });
+    } else {
+      used = [...memoryStore.used];
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(200).json({ used, source });
   } catch (error) {
     console.error('State API Error:', error);
     return res.status(500).json({ error: 'Internal server error', details: error.message });

@@ -216,34 +216,82 @@
     let cachedUsed = [];
     let syncInterval = null;
     
-    // Ambil state dari server
+    // SERVER-SIDE STATE MANAGEMENT (Upstash Redis + LocalStorage sync/fallback)
+    let cachedUsed = [];
+    let syncInterval = null;
+    const LS_KEY = 'mhq-used-paket';
+    
+    // Load dari LocalStorage saat init
+    function loadFromLocalStorage() {
+      try {
+        const saved = localStorage.getItem(LS_KEY);
+        if (saved) {
+          const data = JSON.parse(saved);
+          if (Array.isArray(data.used)) {
+            cachedUsed = data.used;
+            console.log('Loaded from LocalStorage:', cachedUsed);
+            return cachedUsed;
+          }
+        }
+      } catch (e) {
+        console.error('LocalStorage load error:', e);
+      }
+      return [];
+    }
+    
+    // Save ke LocalStorage
+    function saveToLocalStorage(used) {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify({ used, updatedAt: new Date().toISOString() }));
+        console.log('Saved to LocalStorage:', used);
+      } catch (e) {
+        console.error('LocalStorage save error:', e);
+      }
+    }
+
+    // Ambil state dari server (Redis primary)
     async function getUsedPaketFromServer() {
       try {
         const response = await fetch('/api/state');
         if (response.ok) {
           const data = await response.json();
-          return data.used || [];
+          const used = data.used || [];
+          console.log('Loaded from server:', used, 'source:', data.source);
+          
+          // Sync ke LocalStorage
+          saveToLocalStorage(used);
+          
+          return used;
         }
       } catch (error) {
-        console.error('Error fetching state:', error);
+        console.error('Error fetching state from server:', error);
+        // Fallback ke LocalStorage
+        return loadFromLocalStorage();
       }
-      return cachedUsed; // Fallback ke cache
+      return cachedUsed;
     }
     
     // Update cache dan render
     async function refreshUsedPaket() {
+      // Load dari LocalStorage dulu (instant UI)
+      loadFromLocalStorage();
+      renderPaketCards();
+      
+      // Lalu sync dari server (Redis)
       const used = await getUsedPaketFromServer();
       cachedUsed = used;
       renderPaketCards();
       return used;
     }
     
-    // Mark paket sebagai used (sync ke server)
+    // Mark paket sebagai used (Redis primary, LocalStorage sync)
     async function markPaketUsed(id) {
       // CRITICAL: Update local FIRST immediately for persistent UI
       if (!cachedUsed.includes(id)) {
         cachedUsed.push(id);
       }
+      // Save ke LocalStorage (instant)
+      saveToLocalStorage(cachedUsed);
       // Render immediately - don't wait for server
       renderPaketCards();
       
@@ -257,12 +305,9 @@
         
         if (response.ok) {
           const data = await response.json();
-          // Merge server data with local (server wins for other juri updates)
-          data.used.forEach(usedId => {
-            if (!cachedUsed.includes(usedId)) {
-              cachedUsed.push(usedId);
-            }
-          });
+          // Update dengan data dari server (server wins)
+          cachedUsed = data.used || cachedUsed;
+          saveToLocalStorage(cachedUsed);
           renderPaketCards();
         }
       } catch (error) {
@@ -277,6 +322,11 @@
         return;
       }
       
+      // Clear LocalStorage first
+      localStorage.removeItem(LS_KEY);
+      cachedUsed = [];
+      renderPaketCards();
+      
       try {
         const response = await fetch('/api/reset', {
           method: 'POST',
@@ -284,13 +334,11 @@
         });
         
         if (response.ok) {
-          cachedUsed = [];
-          renderPaketCards();
           alert('Data paket berhasil direset!');
         }
       } catch (error) {
         console.error('Error resetting:', error);
-        alert('Gagal reset. Coba lagi.');
+        alert('Gagal reset server, tapi LocalStorage sudah direset.');
       }
     }
     
