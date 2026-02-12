@@ -426,6 +426,18 @@
       startSync();
     }
 
+    // Format ayat dengan simbol pembatas di ujung setiap ayat
+    function formatAyatDenganPembatas(ayatTeks, ayatRange) {
+      if (!ayatTeks || !ayatRange) return ayatTeks;
+      
+      // Split ayat berdasarkan pattern akhir ayat (spasi sebelum ayat baru)
+      // Pattern: cari spasi yang diikuti oleh karakter Arab
+      const ayatList = ayatTeks.split(/(?=\s+[\u0600-\u06FF])/).filter(a => a.trim());
+      
+      // Tambahkan simbol pembatas ⬛ di akhir setiap ayat
+      return ayatList.map(ayat => ayat.trim() + ' ⬛').join(' ');
+    }
+
     // Show detail paket
     async function showPaket(id) {
       const paket = PAKET_SOAL.find(p => p.id === id);
@@ -454,13 +466,17 @@
         
         // Untuk soal Lanjutkan dan Transisi: tampilkan ayat referensi (pertanyaan)
         if (soal.tipe !== 'Lantunkan' && soal.pertanyaan) {
+          const pertanyaanFormatted = formatAyatDenganPembatas(soal.pertanyaan, soal.kunciJawaban.ayat);
           contentHTML += `
             <div class="ayat-box">
-              ${soal.pertanyaan}
+              ${pertanyaanFormatted}
               <span class="referensi">📖 ${soal.kunciJawaban.surah} ayat ${soal.kunciJawaban.ayat}</span>
             </div>
           `;
         }
+
+        // Format kunci jawaban dengan simbol pembatas
+        const kunciFormatted = formatAyatDenganPembatas(soal.kunciJawaban.teks, soal.kunciJawaban.ayat);
 
         soalHTML += `
           <div class="soal-item">
@@ -481,7 +497,7 @@
             
             <div class="kunci-jawaban" id="kunci-${paket.id}-${index}">
               <span class="kunci-label">🔑 Kunci Jawaban: ${soal.kunciJawaban.surah} ayat ${soal.kunciJawaban.ayat}</span>
-              <div class="kunci-arab">${soal.kunciJawaban.teks}</div>
+              <div class="kunci-arab">${kunciFormatted}</div>
             </div>
           </div>
         `;
