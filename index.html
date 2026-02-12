@@ -329,7 +329,11 @@
           card.id = `paket-card-${i}`;
           card.href = '#';
           // Fix closure: capture i dengan IIFE
-          card.onclick = ((id) => (e) => { e.preventDefault(); showPaket(id); })(i);
+          card.onclick = ((id) => (e) => { 
+            console.log('Card clicked, paket id:', id);
+            e.preventDefault(); 
+            showPaket(id); 
+          })(i);
           card.innerHTML = `
             <span class="number">${i}</span>
             <span class="label">Paket</span>
@@ -436,8 +440,13 @@
 
     // Show detail paket
     async function showPaket(id) {
+      console.log('showPaket called with id:', id);
       const paket = PAKET_SOAL.find(p => p.id === id);
-      if (!paket) return;
+      console.log('Found paket:', paket);
+      if (!paket) {
+        console.error('Paket not found for id:', id);
+        return;
+      }
       
       // Stop sync saat melihat soal (hemat request)
       stopSync();
